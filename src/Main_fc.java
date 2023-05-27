@@ -10,8 +10,11 @@ import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+/**
+ *  FC network
+ */
+public class Main_fc {
 
-public class Main {
 
     public static void main(String[] args) throws Exception{
 
@@ -117,7 +120,7 @@ public class Main {
 
     }
 
-    private static void loadData(float[][] x, float[][] y, String file_str) {
+    public static void loadData(float[][] x, float[][] y, String file_str) {
         File file = new File(file_str);
         File[] files = file.listFiles();
 
