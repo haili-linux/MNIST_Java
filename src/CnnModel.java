@@ -35,14 +35,17 @@ public class CnnModel {
         String file_train = "dataSet\\train";
         String file_test = "dataSet\\test";
 
-        //直接从图片文件导入数据集
+        //直接从图片文件导入数据集,多线程
         LoadImage.loadData(x_train, y_train, file_train);
-        LoadImage.loadData(x_test, y_test, file_test);
+
+        //直接从图片文件导入数据集,单线程
+        LoadImage.loadDataOneThread(x_test, y_test, file_test);
 
         int input_dimension = x_train[0].length; //28 * 28
         int width = 28;
         int height = 28;
 
+        /*
         //创建新的空模型
         Sequential sequential = new Sequential(width, height, input_dimension);
         sequential.addLayer(new Conv2D(3, 3, 1, 1, new LRelu())); //添加一层(3x3),输入通道数和输出通道数都为1的卷积层，激活函数为leaky_relu
@@ -57,7 +60,8 @@ public class CnnModel {
         sequential.addLayer(fcNetwork); //添加全连接神经网络模型fcNetwork
 
         sequential.setDeltaOptimizer(new Adam()); //梯度优化
-        */
+         */
+
 
         //导入数据
         float[][][] train_data = LoadImage.loadMnistData("mnist_data_train.txt");

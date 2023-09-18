@@ -45,15 +45,34 @@ public class LoadImage {
         return  bmpToRgbList_L(imgsrc);
     }
 
-
-    public static void loadData(float[][] x, float[][] y, String file_str) {
+    public static void loadDataOneThread(float[][] x, float[][] y, String file_str) throws Exception{
         File file = new File(file_str);
         File[] files = file.listFiles();
 
-        if (files == null) {
-            System.out.println("no found file.");
-            return;
+        if (files == null)
+            throw new Exception("no found file.");
+
+        int index = 0;
+        for(File value: files) {
+            String filename = value.toString();
+            int label = Integer.parseInt(filename.substring(filename.length() - 1));
+            File[] images = value.listFiles();
+
+            for (File image : images) {
+                x[index] = bmpToRgbList_L(image.toString());
+                y[index][label] = 1;
+                index++;
+            }
+            System.out.println("读取mnist数据: " + index + "张.");
         }
+    }
+
+    public static void loadData(float[][] x, float[][] y, String file_str) throws Exception{
+        File file = new File(file_str);
+        File[] files = file.listFiles();
+
+        if (files == null)
+            throw new Exception("no found file.");
 
         int index = 0;
         for (File value : files) {
@@ -79,8 +98,7 @@ public class LoadImage {
 
             ThreadWork.start(threadWorker, 16);
             index += datalist.length;
-            System.out.println(index);
-
+            System.out.println("读取mnist数据: " + index + "张.");
         }
     }
 
