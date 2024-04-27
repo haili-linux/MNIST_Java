@@ -1,4 +1,6 @@
 # MNIST_Java
+基于Java在mnist手写体数字数据集上的卷积神经网络、自编码器、变分编码器(VAE)、生成对抗模型实验。
+
 数据说明：
 
     minst_data.rar：文件里包含归一化到（-1， 1）的mnist数据集，
