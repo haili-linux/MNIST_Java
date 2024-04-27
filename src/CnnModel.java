@@ -1,13 +1,13 @@
-import haili.deeplearn.BpNetwork;
+
 import haili.deeplearn.DeltaOptimizer.Adam;
-import haili.deeplearn.function.LRelu;
-import haili.deeplearn.function.MSELoss;
-import haili.deeplearn.function.Relu;
-import haili.deeplearn.function.Sigmoid;
+import haili.deeplearn.function.Function;
+import haili.deeplearn.function.activation.LRelu;
+import haili.deeplearn.function.activation.Sigmoid;
+import haili.deeplearn.function.activation.Softmax;
+import haili.deeplearn.function.loss.CELoss;
+import haili.deeplearn.function.loss.CESLoss;
 import haili.deeplearn.model.Sequential;
-import haili.deeplearn.model.layer.Conv2D;
-import haili.deeplearn.model.layer.Dense;
-import haili.deeplearn.model.layer.Pooling2D;
+import haili.deeplearn.model.layer.*;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
@@ -40,43 +40,56 @@ public class CnnModel {
 
         //直接从图片文件导入数据集,单线程
         LoadImage.loadDataOneThread(x_test, y_test, file_test);
+        */
 
-        int input_dimension = x_train[0].length; //28 * 28
-        int width = 28;
-        int height = 28;
-
-        /*
-        //创建新的空模型
-        Sequential sequential = new Sequential(width, height, input_dimension);
-        sequential.addLayer(new Conv2D(3, 3, 1, 1, new LRelu())); //添加一层(3x3),输入通道数和输出通道数都为1的卷积层，激活函数为leaky_relu
-        sequential.addLayer(new Pooling2D(2, 2));    // 添加(2x2)的池化层
-        sequential.addLayer(new Conv2D(3, 3, 1, 1, new LRelu()));
-        sequential.addLayer(new Pooling2D(2, 2));
-
-        Sequential fcNetwork = new Sequential(); //创建全连接层模型
-        fcNetwork.addLayer(new Dense(32, new LRelu()));  //添加全连接层
-        fcNetwork.addLayer(new Dense(10, new Sigmoid()));
-
-        sequential.addLayer(fcNetwork); //添加全连接神经网络模型fcNetwork
-
-        sequential.setDeltaOptimizer(new Adam()); //梯度优化
-         */
-
-
-        //导入数据
+        //导入数据，训练集
         float[][][] train_data = LoadImage.loadMnistData("mnist_data_train.txt");
         float[][] x_train = train_data[0];
         float[][] y_train = train_data[1];
 
+        //导入数据，测试集
         float[][][] test_data = LoadImage.loadMnistData("mnist_data_test.txt");
         float[][] x_test = test_data[0];
         float[][] y_test = test_data[1];
 
-        //从文件创建训练过的模型
-        Sequential sequential = new Sequential("mnist_Sequential_model.txt");
+        //创建新的空模型
+        Sequential sequential = new Sequential(28, 28, 28 * 28);
+        sequential.addLayer(new Conv2D(3, 3, 8, 1, new LRelu())); //添加一层(3x3),输入通道数和输出通道数都为1的卷积层，激活函数为leaky_relu
+        sequential.addLayer(new Pooling2D(2, 2));    // 添加(2x2)的池化层
+        sequential.addLayer(new Conv2D(3, 3, 8, 1, new LRelu()));
+        sequential.addLayer(new Dropout(0.2));
+        sequential.addLayer(new Dense(10, new Sigmoid()));//添加全连接层
 
-        System.out.println("模型在测试集的正确率:");
-        testAcc(sequential, x_test, y_test);
+        // 打印模型
+        System.out.println(sequential.summary());
+
+        // 使用交叉熵损失
+        sequential.setLoss_Function(new CELoss());
+
+        //使用Adam梯度优化
+        sequential.setDeltaOptimizer(new Adam());
+
+        //训练之前，简单测试模型识别正确率
+        System.out.println("训练前-训练集: " + testAcc(sequential, x_train, y_train));
+        System.out.println("训练前-测试集: " + testAcc(sequential, x_test, y_test));
+
+        // 训练模型
+        sequential.fit(x_train, y_train, 150, 50, 30);
+
+        //训练后，简单测试模型识别正确率
+        System.out.println("训练后-训练集: " + testAcc(sequential, x_train, y_train));
+        System.out.println("训练后-测试集: " + testAcc(sequential, x_test, y_test));
+
+        // 保存模型
+        String fileName = "mnist_Sequential_model.txt"; //保存文件路径
+        sequential.saveInFile(fileName);
+
+
+        //从保存的模型文件导入模型
+        Sequential sequential2 = new Sequential(fileName);
+        //简单测试模型识别正确率
+        System.out.println("导入模型-训练集: " + testAcc(sequential2, x_train, y_train));
+        System.out.println("导入模型-测试集: " + testAcc(sequential2, x_test, y_test));
 
 
         Scanner sc = new Scanner(System.in);
@@ -119,10 +132,6 @@ public class CnnModel {
                     sequential.saveInFile("mnist_Sequential_model.txt");
                     break;
 
-                case "error":
-                    System.out.println(sequential.calculateLoss(x_train, y_train));
-                    break;
-
                 case "acc"://测试准确率
                     System.out.println("训练集：");
                     testAcc(sequential, x_train, y_train);
@@ -148,7 +157,7 @@ public class CnnModel {
     }
 
     //测试准确率
-    public static float testAcc(Sequential model, float[][] x_train, float[][] y_train) {
+    public static String testAcc(Sequential model, float[][] x_train, float[][] y_train) {
         float acc = 0;
         for(int i = 0; i < x_train.length; i++){
             int p = getMaxIndex(model.forward(x_train[i]));
@@ -156,9 +165,7 @@ public class CnnModel {
             if( p == label ) acc++;
         }
 
-        float r = acc / x_train.length;
-        System.out.println("正确率：" + acc + "/" + x_train.length + " = " + r);
-        return r;
+        return  (100 * acc / x_train.length) + "%";
     }
 
     static int getMaxIndex(float[] arrays){

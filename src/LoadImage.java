@@ -18,7 +18,7 @@ public class LoadImage {
     /**
      * bmp图片像素转数组
      * @param imgsrc bmp图片
-     * @return 。
+     * @return 数值范围 -1.0 ~ 1.0
      * @throws Exception null
      */
     public static float[] bmpToRgbList_L(BufferedImage imgsrc) {
@@ -34,10 +34,62 @@ public class LoadImage {
             for (int i = 0; i < width; i++) {
                 back.setRGB(i, j, imgsrc.getRGB(i, j));
                 rgb[index] = (back.getRGB(i,j) &  0xff) / 255.0f;
+                rgb[index] = (rgb[index] - 0.5f) * 2;
                 index++;
             }
         }
         return rgb;
+    }
+
+    public static float[] GrayscalePixelValues(BufferedImage img) {
+        int width = img.getWidth();
+        int height = img.getHeight();
+
+        float[] rm = new float[width * height];
+        int index = 0;
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int rgb = img.getRGB(x, y);
+                int r = (rgb >> 16) & 0xFF;
+                int g = (rgb >> 8) & 0xFF;
+                int b = rgb & 0xFF;
+
+                // 计算灰度值
+                float gray = (r + g + b) / 3f;
+                rm[index] = gray / 255.0f;
+            }
+        }
+
+        return  rm;
+    }
+
+
+
+    public static BufferedImage arraysToImage(float[] arrays, int width, int height){
+        BufferedImage back = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+
+        int index = 0;
+        for (int j = 0; j < height; j++) {
+            for (int i = 0; i < width; i++) {
+                int v = 0;
+
+                if(arrays[index] > 1.0f)
+                    arrays[index] = 1.0f;
+                else if(arrays[index] < -1f)
+                    arrays[index] = -1f;
+
+                arrays[index] = (arrays[index] + 1) / 2;
+
+                v = (int)(arrays[index] * 255);
+
+                Color color = new Color(v, v, v);
+                back.setRGB(i, j, color.getRGB());
+                //rgb[index] = (back.getRGB(i,j) &  0xff) / 255.0f;
+                index++;
+            }
+        }
+        return back;
     }
 
     public static float[] bmpToRgbList_L(String filename) throws Exception {
@@ -162,6 +214,53 @@ public class LoadImage {
         fileReader.close();
 
         return new float[][][]{x, label};
+    }
+
+    //显示 10 张图片
+    public static JFrame showImages(float[][] images, int width, int height, String title)  {
+        JFrame frame = new JFrame();
+        frame.setTitle(title);
+        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        frame.setLayout(new GridLayout(2, 5)); // 2 rows, 5 columns
+
+        for (int i = 0; i < 10; i++) {
+            BufferedImage img =  LoadImage.arraysToImage(images[i], width, height);
+            img = resizeImage(img, 100, 100);
+            ImageIcon icon = new ImageIcon(img);
+            JLabel label = new JLabel(icon);
+            frame.add(label);
+        }
+
+        frame.pack(); // 自动调整窗口大小以适应图片
+        frame.setSize((100+ 10) * 5, (100 + 30) * 2);
+        frame.setVisible(true);
+        return frame;
+    }
+
+    //调整图片大小
+    public static BufferedImage resizeImage(BufferedImage originalImage, int newWidth, int newHeight) {
+        Image tmp = originalImage.getScaledInstance(newWidth, newHeight, Image.SCALE_SMOOTH);
+        BufferedImage resizedImage = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2d = resizedImage.createGraphics();
+        g2d.drawImage(tmp, 0, 0, null);
+        g2d.dispose();
+        return resizedImage;
+    }
+
+    public static void DisplayImage(float[] image, int width, int height) {
+        BufferedImage img = LoadImage.arraysToImage(image, width, height);
+        img = resizeImage(img, 200, 200);
+        ImageIcon icon = new ImageIcon(img);
+
+        JFrame frame = new JFrame();
+        frame.setLayout(new FlowLayout());
+        frame.setSize(200, 300); // 设置窗口大小
+
+        JLabel label = new JLabel();
+        label.setIcon(icon);
+        frame.add(label);
+
+        frame.setVisible(true);
     }
 
 }
