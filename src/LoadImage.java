@@ -216,15 +216,19 @@ public class LoadImage {
         return new float[][][]{x, label};
     }
 
+    public static JFrame showImages(float[][] images, int width, int height, String title){
+        return  showImages(images, width, height, 2, 5, title);
+    }
+
     //显示 10 张图片
-    public static JFrame showImages(float[][] images, int width, int height, String title)  {
+    public static JFrame showImages(float[][] images, int width, int height, int wn, int hn , String title)  {
         JFrame frame = new JFrame();
         frame.setTitle(title);
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        frame.setLayout(new GridLayout(2, 5)); // 2 rows, 5 columns
+        frame.setLayout(new GridLayout(wn, hn)); // 2 rows, 5 columns
 
-        for (int i = 0; i < 10; i++) {
-            BufferedImage img =  LoadImage.arraysToImage(images[i], width, height);
+        for (int i = 0; i < images.length; i++) {
+            BufferedImage img =  test.LoadImage.arraysToImage(images[i], width, height);
             img = resizeImage(img, 100, 100);
             ImageIcon icon = new ImageIcon(img);
             JLabel label = new JLabel(icon);
@@ -232,7 +236,7 @@ public class LoadImage {
         }
 
         frame.pack(); // 自动调整窗口大小以适应图片
-        frame.setSize((100+ 10) * 5, (100 + 30) * 2);
+        frame.setSize((100 + 10) * hn, (100 + 30) * wn);
         frame.setVisible(true);
         return frame;
     }
