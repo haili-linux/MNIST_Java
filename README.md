@@ -18,10 +18,12 @@
 1. AutoEncoder
    ![Image text](https://github.com/haili-linux/MNIST_Java/blob/master/image/auto_encoder.png?raw=true)
 
-2. VAE Encoder
-   ![Image text](https://github.com/haili-linux/MNIST_Java/blob/master/image/vae.png?raw=true)
-
-3. GAN model
+2. GAN model
    ![Image text](https://github.com/haili-linux/MNIST_Java/blob/master/image/gen_info_1.png?raw=true)
    ![Image text](https://github.com/haili-linux/MNIST_Java/blob/master/image/gen_info_2.png?raw=true)
+   
+3. VAE Encoder
+   ![Image text](https://github.com/haili-linux/MNIST_Java/blob/master/image/vae.png?raw=true)
+
+
 
