@@ -2,7 +2,6 @@ import haili.deeplearn.DeltaOptimizer.Adam;
 import haili.deeplearn.function.Function;
 import haili.deeplearn.function.activation.*;
 import haili.deeplearn.function.loss.CELoss;
-import haili.deeplearn.function.loss.CESLoss;
 import haili.deeplearn.model.Sequential;
 import haili.deeplearn.model.layer.*;
 import haili.deeplearn.model.loss.LossLayer;
@@ -53,39 +52,33 @@ public class GAN {
 
 
         // 创建判别器
-        Sequential predict_mode = new Sequential(28, 28, 28 * 28);
-        predict_mode.addLayer(new Conv2D(5, 5, 64, 2, new LRelu()));
-        predict_mode.addLayer(new Conv2D(5, 5, 128, 2, new LRelu()));
-        predict_mode.addLayer(new Dense(11, new Sigmoid()));
-        //Sequential predict_mode =  new Sequential("pre_mode.txt");
+//        Sequential predict_mode = new Sequential(28, 28, 28 * 28);
+//        predict_mode.addLayer(new Conv2D(5, 5, 32, 2, new LRelu()));
+//        predict_mode.addLayer(new Conv2D(5, 5, 64, 2, new Function(), false));
+//        predict_mode.addLayer(new FilterResponseNormalization());
+//        predict_mode.addLayer(new ActivationLayer(new LRelu()));
+//
+//        predict_mode.addLayer(new Dense(11, new Softmax()));
 
+        // 真实数据数字0-9 + 1个维度表示生成数据
+        Sequential predict_mode = new Sequential("pre_mode.txt");
         // 打印判别器模型
         System.out.println("判别器: " + predict_mode.summary());
 
-
-
         // 创建生成器，输入 54维随机量 + 10维数字
         Sequential gen_mode = new Sequential(54 + 10);
-
         gen_mode.addLayer(new Dense( 6 * 6 * 128, new Function(), false));  //全连接层，激活函数默认f(x)=x
         gen_mode.addLayer(new FilterResponseNormalization());   // 归一化
         gen_mode.addLayer(new ActivationLayer(new LRelu()));    // Leaky_ReLU 激活层
-
         gen_mode.addLayer(new Reshape(6, 6));  // Reshape层， w x h = 6 x 6
-
-        // 反卷积 Conv2DTranspose
-        gen_mode.addLayer(new Conv2DTranspose(5, 5, 32, 1, new Function(), false));
+        gen_mode.addLayer(new Conv2DTranspose(5, 5, 32, 1, new Function(), false));// 反卷积 Conv2DTranspose
         gen_mode.addLayer(new FilterResponseNormalization());
         gen_mode.addLayer(new ActivationLayer(new LRelu()));
-
         gen_mode.addLayer(new Conv2DTranspose(5, 5, 8,1, new Function(), false));
         gen_mode.addLayer(new FilterResponseNormalization());
         gen_mode.addLayer(new ActivationLayer(new LRelu()));
-
         gen_mode.addLayer(new Conv2DTranspose(2, 2, 1, 2, new Tanh(), false));
-
-        //Sequential gen_mode = new Sequential("gen_mode.txt");
-
+        gen_mode = new Sequential("gen_mode.txt");
         // 打印生成器模型
         System.out.println("生成器: " + gen_mode.summary());
 
@@ -93,8 +86,7 @@ public class GAN {
         gen_mode.lossLayer = new LossLayer(){
             @Override
             public float[] gradient(float[] y_pre, float[] y_t) {
-                // y_pre: 生成图片，28 * 28
-                // y_t: 预期生成的图片的真实label
+                // y_pre: 生成图片，28x28， y_t: 预期生成的图片的真实label
                 float[] out_pre = predict_mode.forward(y_pre); // 使用判别器识别生成的图片
                 float[] deltas = predict_mode.lossLayer.gradient(out_pre, y_t); // 判别器loss层
                 return predict_mode.backward(y_pre, out_pre, deltas)[0];// 使用判别器作为loss，返回生成器loss层梯度
@@ -111,13 +103,12 @@ public class GAN {
 
         // 设置学习率
         predict_mode.setLearn_rate(1e-4f);
-        gen_mode.setLearn_rate(1e-4f);
+        gen_mode.setLearn_rate(1e-3f);
 
         //使用 Adam梯度优化
         predict_mode.setDeltaOptimizer(new Adam());
         gen_mode.setDeltaOptimizer(new Adam());
 
-        float gen_rate = 0.1f;
 
         Scanner scanner = new Scanner(System.in);
         while (true){
@@ -133,7 +124,7 @@ public class GAN {
                         float[][] truly_test_image = new float[10][];
                         for (int i = 0; i < truly.length; i++) {
                             int randomNum = random.nextInt(x_train.length);
-                            truly_test_image[i] = add_noise(x_train[randomNum], (float) Math.random() / 20.f); //添加噪声后的
+                            truly_test_image[i] = x_train[randomNum]; // add_noise(x_train[randomNum], (float) Math.random() / 20.f); //添加噪声后的
                             float[] pre_t = predict_mode.forward(truly_test_image[i]); //判别结果
                             float[] label_t = y_train[randomNum];
 
@@ -199,10 +190,10 @@ public class GAN {
 
                     //训练，指定训练时间
                     case "learnt": {
-                        System.out.print("是否训练:判别器 生成数据 ");
-                        int p1, g1;
-                        p1 = scanner.nextInt();
-                        g1 = scanner.nextInt();
+//                        System.out.print("是否训练:判别器 生成数据 ");
+//                        int p1, g1;
+//                        p1 = scanner.nextInt();
+//                        g1 = scanner.nextInt();
 
                         System.out.print("训练判别器时生成数据比例:");
                         float f0 = scanner.nextFloat();
@@ -254,7 +245,6 @@ public class GAN {
 
                                 // 生成数据数量
                                 int var0_int = genDataNum / 10;
-
                                 // 生成训练数据
                                 for (int i = 0; i < genDataNum; i++) {
                                     int label = i / var0_int; //预期标签, 10个类型平均
@@ -270,29 +260,22 @@ public class GAN {
                                     pre_y_bach_gen[i][10] = 1f; //训练判别器用的标签
                                 }
 
+                                // 合并真实数据和生成数据
+                                float[][] x__ = new float[pre_x_bach.length + pre_x_bach_gen.length][];
+                                float[][] y__ = new float[pre_x_bach.length + pre_x_bach_gen.length][];
+                                System.arraycopy(pre_x_bach, 0, x__, 0, pre_x_bach.length);
+                                System.arraycopy(pre_y_bach, 0, y__, 0, pre_x_bach.length);
+                                System.arraycopy(pre_x_bach_gen, 0, x__, pre_x_bach.length, pre_x_bach_gen.length);
+                                System.arraycopy(pre_y_bach_gen, 0, y__, pre_x_bach.length, pre_x_bach_gen.length);
 
-                                //分别计算判别模型在真实数据和生成数据参数梯度
-                                float[][] pre_deltas_X_Yt = null, pre_deltas_G_Yt;
-                                if(p1 != 0) {
-                                    pre_deltas_X_Yt = predict_mode.gradient(pre_x_bach, pre_y_bach, 28);
-                                    pre_deltas_G_Yt = predict_mode.gradient(pre_x_bach_gen, pre_y_bach_gen, 28);
-                                    // 把在真实数据和生成数据上的梯度 相加
-                                    for (int i = 0; i < pre_deltas_G_Yt.length; i++) {
-                                        for (int j = 0; j < pre_deltas_G_Yt[i].length; j++)
-                                            pre_deltas_X_Yt[i][j] += gen_rate * pre_deltas_G_Yt[i][j];
-                                    }
-                                }
-
-                                float[][] gen_layers_deltas = null;
+                                // 判别器模型参数权重
+                                float[][] pre_deltas = predict_mode.gradient(x__, y__, 28);
                                 //生成器参数梯度
-                                if(g1 != 0)
-                                    gen_layers_deltas = gen_mode.gradient(gen_x_bach, gen_y_bach, 24);//生成模型梯度
+                                float[][] gen_deltas = gen_mode.gradient(gen_x_bach, gen_y_bach, 28);//生成模型梯度
 
                                 //分别更新模型参数
-                                if(g1 != 0)
-                                    gen_mode.upgradeWeight(gen_layers_deltas);
-                                if(p1 != 0)
-                                    predict_mode.upgradeWeight(pre_deltas_X_Yt);
+                                gen_mode.upgradeWeight(gen_deltas);
+                                predict_mode.upgradeWeight(pre_deltas);
 
                                 //每50个batch，显示生成效果
                                 if(bach % 2000 == 0) {
@@ -385,19 +368,25 @@ public class GAN {
                                 }
 
                                 //分别计算判别模型在真实数据和生成数据参数梯度
-                                float[][] pre_deltas_X_Yt = predict_mode.gradient(pre_x_bach, pre_y_bach, 28);
-                                float[][] pre_deltas_G_Yt = predict_mode.gradient(pre_x_bach_gen, pre_y_bach_gen, 28);
-                                for (int i = 0; i < pre_deltas_G_Yt.length; i++) {
-                                    for (int j = 0; j < pre_deltas_G_Yt[i].length; j++)
-                                        pre_deltas_X_Yt[i][j] += gen_rate * pre_deltas_G_Yt[i][j]; //梯度相加
-                                }
+
+
+                                // 合并真实数据和生成数据
+                                float[][] x__ = new float[pre_x_bach.length + pre_x_bach_gen.length][];
+                                float[][] y__ = new float[pre_x_bach.length + pre_x_bach_gen.length][];
+                                System.arraycopy(pre_x_bach, 0, x__, 0, pre_x_bach.length);
+                                System.arraycopy(pre_y_bach, 0, y__, 0, pre_x_bach.length);
+                                System.arraycopy(pre_x_bach_gen, 0, x__, pre_x_bach.length, pre_x_bach_gen.length);
+                                System.arraycopy(pre_y_bach_gen, 0, y__, pre_x_bach.length, pre_x_bach_gen.length);
+
+                                // 判别器模型参数权重
+                                float[][] pre_deltas = predict_mode.gradient(x__, y__, 28);
 
                                 //计算生成器梯度
                                 float[][] gen_layers_deltas = gen_mode.gradient(gen_x_bach, gen_y_bach, 28);//生成模型梯度
 
                                 // 更新生成器和判别器的参数
                                 gen_mode.upgradeWeight(gen_layers_deltas);
-                                predict_mode.upgradeWeight(pre_deltas_X_Yt);
+                                predict_mode.upgradeWeight(pre_deltas);
 
                                 //更新训练进度条
                                 System.out.print(progressBarCmd.setProgress(bach + 1));
@@ -432,9 +421,6 @@ public class GAN {
 
                         System.out.print("gen model:");
                         float f2 = scanner.nextFloat();
-
-                        System.out.print("gen_rata:");
-                        gen_rate = scanner.nextFloat();
 
                         predict_mode.setLearn_rate(f1);
                         gen_mode.setLearn_rate(f2);

@@ -1,10 +1,10 @@
 import haili.deeplearn.DeltaOptimizer.Adam;
+import haili.deeplearn.function.Function;
+import haili.deeplearn.function.activation.LRelu;
 import haili.deeplearn.function.activation.Sigmoid;
 import haili.deeplearn.function.loss.CELoss;
 import haili.deeplearn.model.Sequential;
-import haili.deeplearn.model.layer.Dense;
-import haili.deeplearn.model.layer.SelfAttention;
-import test.LoadImage;
+import haili.deeplearn.model.layer.*;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
@@ -35,20 +35,24 @@ public class ImagePredictAttention {
         for(int i = 0; i < x_test.length; i++)
             x_test[i] = reshapeImage(x_test[i], 28, 28, 7, 7);
 
+
+        PositionLayer positionLayer = new PositionLayer(63, 1, 16);
         // 创建模型
         Sequential sequential = new Sequential();
-        sequential.addLayer(new SelfAttention(7 * 7, 64, 64));
-        // 指定Dense成输入维度，只取attention层输出的前8个向量
-        sequential.addLayer(new Dense(64 * 8, 10, new Sigmoid()));
-
-        // 加载已经训练的模型
-        //Sequential sequential = new Sequential("mnist_Attention_model.txt");
+        sequential.addLayer(new SlidingWindowLayer(49, new Dense(49, 63, new Function())));
+        sequential.addLayer(positionLayer);
+        sequential.addLayer(new SelfAttention(64, 64, 64));
+        sequential.addLayer(new SlidingWindowLayer(64 ,new Dense(64, 64, new LRelu())));
+        sequential.addLayer(new CombineSequencesLayer(64));
+        sequential.addLayer(new Dense(64, 10, new Sigmoid()));
 
         System.out.println(sequential.summary());
 
         sequential.setLearn_rate(1e-4f);
         sequential.setDeltaOptimizer(new Adam());
         sequential.setLoss_Function(new CELoss());
+
+        //sequential.fit(x_train, y_train, 150, 50, 30);
 
         Scanner sc = new Scanner(System.in);
         while (true) {
@@ -131,6 +135,12 @@ public class ImagePredictAttention {
                     }
                 }
                 break;
+
+                default:{
+                    for (float[] pi: positionLayer.positionCode)
+                        System.out.println(Arrays.toString(pi));
+                }
+                break;
             }
 
         }
@@ -195,7 +205,7 @@ public class ImagePredictAttention {
                 int x = sx * split_w + x_;
                 int y = sy * split_h + y_;
                 int index_x_y = x * w + y;
-                reshapeImage[ds + j] = image[index_x_y] +  (i / 160f); // 额外加上位置编码
+                reshapeImage[ds + j] = image[index_x_y];// +  (i / 160f); // 额外加上位置编码
                 //sImage[i][j] = image[index_x_y];
             }
         }

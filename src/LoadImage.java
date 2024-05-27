@@ -228,7 +228,7 @@ public class LoadImage {
         frame.setLayout(new GridLayout(wn, hn)); // 2 rows, 5 columns
 
         for (int i = 0; i < images.length; i++) {
-            BufferedImage img =  test.LoadImage.arraysToImage(images[i], width, height);
+            BufferedImage img = LoadImage.arraysToImage(images[i], width, height);
             img = resizeImage(img, 100, 100);
             ImageIcon icon = new ImageIcon(img);
             JLabel label = new JLabel(icon);

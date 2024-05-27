@@ -1,13 +1,10 @@
 import haili.deeplearn.DeltaOptimizer.Adam;
 import haili.deeplearn.function.Function;
 import haili.deeplearn.function.activation.LRelu;
-import haili.deeplearn.function.activation.Sigmoid;
 import haili.deeplearn.function.activation.Tanh;
-import haili.deeplearn.function.loss.CELoss;
 import haili.deeplearn.model.Sequential;
 import haili.deeplearn.model.layer.*;
 
-import java.awt.*;
 import java.io.File;
 import java.util.*;
 
@@ -27,11 +24,13 @@ public class AutoEncoder {
         System.arraycopy(train_data[0], 0, x_train, 0, train_data[0].length);
         System.arraycopy(test_data[0], 0, x_train, train_data[0].length, test_data[0].length);
 
+        // AutoEncoder
         // 创建编码器
         Sequential encoder_model = new Sequential(28, 28, 28 * 28);
         encoder_model.addLayer(new Conv2D(5, 5, 16, 2, new LRelu()));
         encoder_model.addLayer(new Conv2D(3, 3, 16, 1, new LRelu()));
         encoder_model.addLayer(new Dense(32, new Tanh()));
+        //Sequential encoder_model = new Sequential("encoder_model.txt");
 
         // 创建解码器
         Sequential decoder_model = new Sequential(32, 1, 32);
@@ -43,6 +42,8 @@ public class AutoEncoder {
         decoder_model.addLayer(new FilterResponseNormalization());
         decoder_model.addLayer(new ActivationLayer(new LRelu()));
         decoder_model.addLayer(new Conv2DTranspose(2,2,1,2, new Tanh(), false));
+        // output = 28 * 28
+        //Sequential decoder_model = new Sequential("decoder_model.txt");
 
         System.out.println("Encoder: " + encoder_model.summary());
         System.out.println("Decoder: " + decoder_model.summary());
@@ -53,6 +54,7 @@ public class AutoEncoder {
         sequential.addLayer(decoder_model);
 
         sequential.setDeltaOptimizer(new Adam());
+        sequential.setLearn_rate(1e-4f);
 
         Scanner scanner = new Scanner(System.in);
         while (true){

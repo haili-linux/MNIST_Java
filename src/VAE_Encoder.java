@@ -33,7 +33,6 @@ public class VAE_Encoder {
 
 
         int latent_dim = 2;
-
         //Sequential encoder_model = new Sequential("vae_encoder_model.txt");
         // 创建编码器
         Sequential encoder_model = new Sequential(28, 28, 28 * 28);
@@ -41,7 +40,7 @@ public class VAE_Encoder {
         encoder_model.addLayer(new Conv2D(3, 3, 64, 2, new LRelu()));
         encoder_model.addLayer(new Dense(latent_dim + latent_dim));
 
-        // 自定义层，添加gauss
+        // 自定义层，添加gauss noise
         Layer addGaussNoiseLayer = new Layer(){
             @Override
             public void init(int input_width, int input_height, int input_Dimension) {
@@ -62,12 +61,11 @@ public class VAE_Encoder {
                 System.arraycopy(inputs, 0, outputs, 0, inputs.length);
                 System.arraycopy(gaussNoise, 0, outputs,  inputs.length, len);
 
-                // outputs = { [mean], [logVar], [noise] };
-                return outputs;
+                return outputs; // outputs = { [mean], [logVar], [noise] };
             }
         };
 
-        // 自定义层，reparameterize
+        // 自定义reparameterize层
         Layer reparameterizeLayer = new Layer(){
             @Override
             public void init(int input_width, int input_height, int input_Dimension) {
@@ -136,20 +134,18 @@ public class VAE_Encoder {
         decoder_model.addLayer(new ActivationLayer(new LRelu()));
         decoder_model.addLayer(new Conv2DTranspose(2,2,1,2, new Tanh(), false));
 
-        // 创建残差块，将encoder输出以拼接的方式传递到输出，方便在loss里 约束mean和logVar
+        // 创建残差块，将encoder输出以拼接的方式传递到输出，以便在loss里 约束mean和logVar
         ResBlock resBlock = new ResBlock(latent_dim + latent_dim, ResBlock.ResConnectType_Concat);
         resBlock.addLayer(addGaussNoiseLayer);
         resBlock.addLayer(reparameterizeLayer);
         resBlock.addLayer(decoder_model);
-        //resBlock outputs = {[image0~728], [mean0,m1, .., mean_N], [logVar0,..., logVarN] }
 
+        // 创建sequential容器，连接encoder和decoder
         Sequential sequential = new Sequential();
         sequential.addLayer(encoder_model);
         sequential.addLayer(resBlock);
         // outputs = {[image0~728], [mean0,m1, .., mean_N], [logVar0,..., logVarN] }
-
-        // 打印模型
-        System.out.println(sequential.summary());
+        System.out.println(sequential.summary()); // 打印模型
 
         // 自定义模型损失loss
         sequential.lossLayer = new LossLayer(){
@@ -209,8 +205,10 @@ public class VAE_Encoder {
                 return MatrixUtil.sum(loss_arrays(y_pre, y_t)) / y_pre.length;
             }
         };
+        // 使用Adam梯度优化
         sequential.setDeltaOptimizer(new Adam());
-
+        // 训练
+        // sequential.fit(x_train, x_train, 256, 10, 30);
 
         Scanner scanner = new Scanner(System.in);
         while (true) {
