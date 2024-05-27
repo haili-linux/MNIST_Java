@@ -14,3 +14,4 @@
     2.配置引用libs文件夹下的jar包
     
     3.运行相应模型代码, 详细请自行查看代码
+![Image text](https://github.com/haili-linux/MNIST_Java/blob/master/image/auto_encoder.png?raw=true)
