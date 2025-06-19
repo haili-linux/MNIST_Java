@@ -1,216 +1,3 @@
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.Arrays;
-
-import haili.deeplearn.DeltaOptimizer.Adam;
-import haili.deeplearn.function.Function;
-import haili.deeplearn.function.activation.LRelu;
-import haili.deeplearn.function.activation.Softmax;
-import haili.deeplearn.function.activation.Tanh;
-import haili.deeplearn.model.Sequential;
-import haili.deeplearn.model.loss.LossLayer;
-import haili.deeplearn.utils.MatrixUtil;
-import haili.deeplearn.model.layer.*;
-
-public class QLearning2 {
-
-    Sequential model;
-    ArrayList<float[]> train_x;
-    ArrayList<float[]> train_y;
-    ArrayList<float[]> train_x_buffer;
-    ArrayList<float[]> train_y_buffer;
-
-
-
-    public static void main(String[] args) {
-        QLearning2 qLearning2 = new QLearning2();
-        float[][] x = new float[100][];
-        float[][] y = new float[100][];
-        for(int i = 0; i < x.length; i+=5){
-            float[] s = Layer.GaussRandomArrays(qLearning2.model.input_dimension - 5);
-            for(int j = 0; j < 5; j++){
-                float[] act = new float[5];
-                act[j] = 1;
-                x[i + j] = MatrixUtil.combine(s, act);
-                y[i + j] = Layer.GaussRandomArrays(qLearning2.model.output_dimension);
-            }
-        }
-
-        float loss = qLearning2.model.calculateLoss(x, y);
-        System.out.println(loss);
-        qLearning2.model.fit(x, y, 10, 20, 4);
-        loss = qLearning2.model.calculateLoss(x, y);
-        System.out.println(loss);
-    }
-
-    public QLearning2(){
-        train_x = new ArrayList<>();
-        train_y = new ArrayList<>();  
-        train_x_buffer = new ArrayList<>();
-        train_y_buffer = new ArrayList<>();
-
-        Sequential sNet = new Sequential(17, 17, 289);
-        sNet.addLayer(new Conv2D(5, 5, 16, 1, new LRelu()));
-        sNet.addLayer(new Conv2D(3, 3, 8, 1, new LRelu()));
-        sNet.addLayer(new Conv2D(3, 3, 8, 1, new Function()));
-        sNet.addLayer(new FilterResponseNormalization());
-        sNet.addLayer(new ActivationLayer(new LRelu()));
-
-        Sequential qNet = new Sequential(sNet.output_dimension + 5/*act dimension*/);
-        ResBlock resBlock_split = new ResBlock(new SplitLayer(sNet.output_dimension, 5), ResBlock.ResConnectType_Concat);
-        resBlock_split.addLayer(new Dense(128 - 5));
-        resBlock_split.addLayer(new FilterResponseNormalization());
-        resBlock_split.addLayer(new ActivationLayer(new LRelu()));
-        qNet.addLayer(resBlock_split);
-
-        qNet.addLayer(new Dense(128));
-        qNet.addLayer(new FilterResponseNormalization());
-        qNet.addLayer(new ActivationLayer(new LRelu()));
-
-        ResBlock resBlock0 = new ResBlock(ResBlock.ResConnectType_Add);
-        resBlock0.addLayer(new Dense(128));
-        resBlock0.addLayer(new FilterResponseNormalization());
-        resBlock0.addLayer(new ActivationLayer(new LRelu()));
-
-        qNet.addLayer(resBlock0);
-
-        qNet.addLayer(new Dense(64));
-        qNet.addLayer(new FilterResponseNormalization());
-        qNet.addLayer(new ActivationLayer(new LRelu()));
-
-        ResBlock resBlock01 = new ResBlock(ResBlock.ResConnectType_Add);
-        resBlock01.addLayer(new Dense(64));
-        resBlock01.addLayer(new FilterResponseNormalization());
-        resBlock01.addLayer(new ActivationLayer(new LRelu()));
-        qNet.addLayer(resBlock01);
-        qNet.addLayer(new Dense(1));
-
-
-        SplitLayer a_splitLayer = new SplitLayer(289, 5);
-        ResBlock resBlock = new ResBlock(a_splitLayer, ResBlock.ResConnectType_Concat);
-        resBlock.addLayer(new SplitLayer(0, 289));
-        resBlock.addLayer(new Reshape(17, 17));
-        resBlock.addLayer(sNet);
-
-        model = new Sequential(289 + 5);
-        model.addLayer(resBlock);
-        model.addLayer(qNet);
-        model.setDeltaOptimizer(new Adam());
-        model.setLearn_rate(1e-4f);
-        System.out.println(model.summary());
-    }
-
-    public QLearning2(String fileName){
-        train_x = new ArrayList<>();
-        train_y = new ArrayList<>();
-        train_x_buffer = new ArrayList<>();
-        train_y_buffer = new ArrayList<>();
-        model = new Sequential(fileName);
-        System.out.println(model.summary());
-    }
-
-    public float[] play(float[] s){
-        float[] actList = new float[5];
-        float maxr = -999999999;
-        int max_index = 0;
-        ArrayList<Integer> integersAct = new ArrayList<>();
-
-        for(int i = 0; i < 5; i++){
-            float[] act = new float[5];
-            act[i] = 1;
-            float[] input = MatrixUtil.combine(s, act);
-            float pr = model.forward(input)[0];
-
-            if(pr > maxr){
-                maxr = pr;
-                max_index = i;
-            } else  if(pr == maxr){
-                integersAct.add(i);
-            }
-            System.out.println("play()   act:" + Arrays.toString(act) + "   point:"  + pr);
-        }
-
-        integersAct.add(max_index);
-
-        if(integersAct.size() > 1){
-            int rint = (int)(Math.random() * integersAct.size());
-            actList[integersAct.get(rint)] = 1;
-        }else{
-            actList[max_index] = 1;
-        }
-
-        return actList;
-    }
-
-    private int dataBufferSize = 256 * 100;
-
-    public static Function tanh = new Tanh();
-    public void addData(float[] s, float[] a, float[] r){
-        train_x_buffer.add(MatrixUtil.combine(s, a));
-        train_y_buffer.add(r);
-
-        int t = train_y_buffer.size();
-
-        if(r[0] > 0){
-            if(r[0] >= 1){
-
-                for(int i = 0; i < t; i++){
-                    float[] st = train_y_buffer.get(i);
-                    st[0] += r[0] * (float)Math.pow(0.9, t - i);//- (t - i - 1) * 0.0001f; //　基礎のポイント - 時間に関する懲罰
-                    //st[0] = tanh.f(st[0]);
-                }
-
-                train_x.addAll(train_x_buffer);
-                train_x_buffer.clear();
-                train_y.addAll(train_y_buffer);
-                train_y_buffer.clear();
-            }
-        } else {
-
-            train_x.addAll(train_x_buffer);
-            train_x_buffer.clear();
-            train_y.addAll(train_y_buffer);
-            train_y_buffer.clear();
-        }
-
-
-        while(train_x.size() > dataBufferSize){
-            train_x.remove(0);
-            train_y.remove(0);
-        }
-    }
-
-
-    public void trainning(int epoch, int batch_size, int thread_number){
-        if(train_x.size() < batch_size) return;
-
-        float[][] tx = new float[train_x.size()][];
-        float[][] ty = new float[train_y.size()][];
-        for(int i = 0; i < tx.length; i++){
-            tx[i] = train_x.get(i);
-            ty[i] = train_y.get(i);
-        }
-
-        model.fit(tx, ty, batch_size, epoch, thread_number);
-        model.calculateLoss(tx, ty);
-    }
-
-   
-
-    public void save(String fileName) throws Exception{ 
-
-        File file = new File(fileName);
-        if(file.exists() && file.isFile())
-            file.delete();
-
-        model.EXPLAIN = GAN.getDataTime();
-        model.saveInFile(fileName);
-    }
-}
-
-
 import java.util.*;
 
 import haili.deeplearn.model.Sequential;
@@ -230,88 +17,16 @@ public class SnakeGame {
     private static final char EMPTY_CHAR = ' ';
     private static final char WALL_CHAR = '#';
 
-    private static Deque<Point> snake = new LinkedList<>();
-    private static Point food;
+    private Deque<Point> snake = new LinkedList<>();
+    private Point food;
     private static char direction = 'D'; // 方向：右
-    private static boolean gameOver = false;
+    public boolean gameOver = false;
     private static Random rand = new Random();
-    private static StringBuffer gameStr = new StringBuffer();
+    public StringBuffer gameStr = new StringBuffer();
 
-    static boolean VIEW = true;
+    public boolean VIEW = true;
 
-    public static void main(String[] args) throws Exception {
-
-        QLearning2 qLearningTest = new QLearning2();
-        
-        //VIEW = false;
-
-        initGame();
-
-        int n = 0;
-        boolean flag2 = false;
-        while (true) {
-            render();
-
-            float[] s = statToFloat(gameStr.toString());
-            float[] act;
-            if(n%2 == 0 && false)
-                act = playRandom();
-            else
-                act = qLearningTest.play(s);
-
-            //act = qLearningTest.play(s);
-            //act = keyInput();
-
-            //test(qLearningTest.model, s);
-            //if(VIEW) return;
-            // if(VIEW){
-            //     float[] pr = qLearningTest.qNetForward(s, act);
-            //     System.out.println(Arrays.toString(act) + "    Predict_r: " + pr[0]);
-            // }
-
-            readInput(floatToAct(act));
-            update();
-            System.out.println(n + "    " + Arrays.toString(act) + "    Tr: " + p_flag);
-            qLearningTest.addData(s, act, new float[]{p_flag});
-            
-            if(gameOver){
-
-                qLearningTest.trainning(10, 64, 4);
-                System.out.println("Loss: " + qLearningTest.model.loss);
-                Thread.sleep(1000);
-
-                if(flag2)
-                    VIEW = !VIEW;
-
-                if(n % 10 == 0){
-                    System.out.println("Loss: " + qLearningTest.model.loss);
-                    Thread.sleep(1000);
-                }
-
-                if(flag2 = n%10==0 && !VIEW){
-                    VIEW = true;
-                    flag2 = true;
-                    qLearningTest.save("qLearningTestModel.txt");
-                }
-
-                System.out.println("Game Over! point: " + (snake.size() - 1));
-                qLearningTest.addData(s, act, new float[]{p_flag});
-        
-                if(VIEW)
-                    Thread.sleep(200);
-                initGame();
-                n++;
-            }
-            
-            p_flag = 1e-2f;
-            
-            if(VIEW)
-                Thread.sleep(200); // ゲーム速度
-
-        } 
-
-    }
-
+    
     public static void test(Sequential model, float[] s){
         
             //model = qLearningTest.model;
@@ -370,6 +85,7 @@ public class SnakeGame {
     }
 
     public static float[] statToFloat(String s){
+        s = s.replace("\n", "");
         float[] r = new float[s.length()];
         for(int i = 0; i < s.length(); i++){
             char c = s.charAt(i);
@@ -397,9 +113,7 @@ public class SnakeGame {
     }
 
 
-
-
-    private static void initGame() {
+    public void initGame() {
         gameOver = false;
 
         snake.clear();
@@ -415,7 +129,7 @@ public class SnakeGame {
         generateFood();
     }
 
-    private static void generateFood() {
+    private void generateFood() {
         while (true) {
             int x = rand.nextInt(WIDTH);
             int y = rand.nextInt(HEIGHT);
@@ -427,10 +141,7 @@ public class SnakeGame {
         }
     }
 
-    //ポイントが変わると　trueになる
-    private static float p_flag = 1e-2f;
-
-    private static void update() {
+    public void update() {
         Point head = snake.peekFirst();
         Point newHead = new Point(head.x, head.y);
 
@@ -444,7 +155,7 @@ public class SnakeGame {
         
         if (newHead.x < 0 || newHead.y < 0 || newHead.x >= WIDTH || newHead.y >= HEIGHT || snake.contains(newHead)) {
             gameOver = true;
-            p_flag = -1;
+
             return;
         }
 
@@ -452,13 +163,12 @@ public class SnakeGame {
 
         if (newHead.equals(food)) {
             generateFood(); 
-            p_flag = 1;
         } else {
             snake.removeLast(); 
         }
     }
 
-    private static void render() {
+    public void render() {
         char[][] board = new char[HEIGHT][WIDTH];
 
         for (char[] row : board) Arrays.fill(row, EMPTY_CHAR);
@@ -501,11 +211,12 @@ public class SnakeGame {
         
         if(VIEW){
             System.out.println(gameStr);
+            System.out.println(gameStr.toString().length());
             System.out.println();
         }
     }
 
-    private static void readInput() {
+    public void readInput() {
         try {
             BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
             while (!gameOver) {
@@ -524,7 +235,7 @@ public class SnakeGame {
         }
     }
 
-    private static void readInput(char input){
+    public void readInput(char input) {
         if ((input == 'W' && direction != 'S') ||
             (input == 'S' && direction != 'W') ||
             (input == 'A' && direction != 'D') ||
@@ -532,6 +243,11 @@ public class SnakeGame {
             direction = input;
         }
     }
+   
+    public int getSorce() {
+        return gameOver ? snake.size() - 64 - 2 : snake.size() - 2;
+    }
+   
     // 简单 Point 类
     private static class Point {
         int x, y;
@@ -551,4 +267,121 @@ public class SnakeGame {
     }
 
 }
+
+
+
+import java.sql.Array;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Queue;
+
+import haili.deeplearn.DeltaOptimizer.Adam;
+import haili.deeplearn.function.Function;
+import haili.deeplearn.function.activation.LRelu;
+import haili.deeplearn.model.Sequential;
+import haili.deeplearn.model.layer.ActivationLayer;
+import haili.deeplearn.model.layer.Conv2D;
+import haili.deeplearn.model.layer.Dense;
+import haili.deeplearn.model.layer.FilterResponseNormalization;
+import haili.deeplearn.model.layer.Layer;
+import haili.deeplearn.model.layer.ResBlock;
+import haili.deeplearn.model.layer.Reshape;
+import haili.deeplearn.model.layer.SplitLayer;
+import haili.deeplearn.utils.MatrixUtil;
+
+
+
+
+public class Test{
+
+    static QLearning2 qLearning2 = new QLearning2();
+
+    static ArrayList<float[]> statusList = new ArrayList<>();
+    static ArrayList<float[]> actList = new ArrayList<>();
+    static ArrayList<Float> sorceList = new ArrayList<>();
+    static ArrayList<Integer> gameOverList = new ArrayList<>();
+    
+
+    public static void main(String[] args) throws Exception{
+
+        SnakeGame snakeGame = new SnakeGame();
+        snakeGame.initGame();
+        
+
+        long time = System.currentTimeMillis();
+        while (true) {
+            snakeGame.render();
+
+            float[] s = SnakeGame.statToFloat(snakeGame.gameStr.toString());
+            float[] act = qLearning2.play(s);
+            statusList.add(s);
+            actList.add(act);
+
+            snakeGame.readInput(SnakeGame.floatToAct(act));
+            snakeGame.update();
+
+            sorceList.add((float)snakeGame.getSorce());
+        
+            if(snakeGame.gameOver){
+                System.out.println("gameOver  Sc " + snakeGame.getSorce());
+                
+                long nowtime = System.currentTimeMillis();
+                if ( nowtime - time > 60000) {
+                    snakeGame.VIEW = true;
+                    time = nowtime;
+                } else {
+                    snakeGame.VIEW = false;
+                }
+
+                gameOverList.add(0);
+                snakeGame.initGame();
+            } else {
+                System.out.println("Sc " + snakeGame.getSorce());
+                gameOverList.add(1);
+            }
+            
+
+            if(snakeGame.VIEW)
+                Thread.sleep(200); // ゲーム速度
+            else 
+                trainning();
+        }
+
+    }
+
+    public static void removeData() {
+        if (statusList.size() > 512) {
+            statusList.remove(0);
+            actList.remove(0);
+            sorceList.remove(0);
+            gameOverList.remove(0);
+        }
+    }
+
+    public static void trainning() {
+        if (sorceList.size() == 0)
+            return;
+
+        float[][] train_x = new float[statusList.size()][];
+        float[][] train_y = new float[statusList.size()][];
+
+        for (int i = 0; i < train_x.length; i++) {
+            train_x[i] = MatrixUtil.combine(statusList.get(i), actList.get(i));
+
+            if (gameOverList.get(i) == 1 && i < train_x.length - 1)
+                train_y[i] = new float[]{ sorceList.get(i) + 0.9f * qLearning2.getMaxSorce(statusList.get(i + 1))};
+            else 
+                train_y[i] = new float[]{ sorceList.get(i) };
+        }
+
+        qLearning2.model.fit(train_x, train_y, 64, 10, 4);
+    }
+
+
+   
+}
+
+
 
