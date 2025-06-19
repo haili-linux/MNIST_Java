@@ -23,6 +23,7 @@ public class SnakeGame {
     public boolean gameOver = false;
     private static Random rand = new Random();
     public StringBuffer gameStr = new StringBuffer();
+    public int time = 0;
 
     public boolean VIEW = true;
 
@@ -142,6 +143,7 @@ public class SnakeGame {
     }
 
     public void update() {
+        time++;
         Point head = snake.peekFirst();
         Point newHead = new Point(head.x, head.y);
 
@@ -155,7 +157,6 @@ public class SnakeGame {
         
         if (newHead.x < 0 || newHead.y < 0 || newHead.x >= WIDTH || newHead.y >= HEIGHT || snake.contains(newHead)) {
             gameOver = true;
-
             return;
         }
 
@@ -163,8 +164,13 @@ public class SnakeGame {
 
         if (newHead.equals(food)) {
             generateFood(); 
+            time = 0;
         } else {
             snake.removeLast(); 
+        }
+
+        if(time > 100) {
+            gameOver = true;
         }
     }
 
@@ -244,8 +250,8 @@ public class SnakeGame {
         }
     }
    
-    public int getSorce() {
-        return gameOver ? snake.size() - 64 - 2 : snake.size() - 2;
+    public float getSorce() {
+        return gameOver ? snake.size() * 2 - 64  - time * 0.05f : snake.size() * 2  - time * 0.05f;
     }
    
     // 简单 Point 类
@@ -267,7 +273,6 @@ public class SnakeGame {
     }
 
 }
-
 
 
 import java.sql.Array;
@@ -294,7 +299,7 @@ import haili.deeplearn.utils.MatrixUtil;
 
 
 
-public class Test{
+public class Test implements Comparable<Test>{
 
     static QLearning2 qLearning2 = new QLearning2();
 
@@ -322,31 +327,30 @@ public class Test{
             snakeGame.readInput(SnakeGame.floatToAct(act));
             snakeGame.update();
 
-            sorceList.add((float)snakeGame.getSorce());
-        
+            sorceList.add(snakeGame.getSorce());
+
+            long nowtime = System.currentTimeMillis();
+            if ( nowtime - time > 10000) {
+                snakeGame.VIEW = true;
+                time = nowtime;
+            } 
+            
             if(snakeGame.gameOver){
                 System.out.println("gameOver  Sc " + snakeGame.getSorce());
-                
-                long nowtime = System.currentTimeMillis();
-                if ( nowtime - time > 60000) {
-                    snakeGame.VIEW = true;
-                    time = nowtime;
-                } else {
-                    snakeGame.VIEW = false;
-                }
-
                 gameOverList.add(0);
+                trainning();
+                snakeGame.VIEW = false;
                 snakeGame.initGame();
+                continue;
             } else {
                 System.out.println("Sc " + snakeGame.getSorce());
                 gameOverList.add(1);
             }
-            
+
+            removeData();
 
             if(snakeGame.VIEW)
                 Thread.sleep(200); // ゲーム速度
-            else 
-                trainning();
         }
 
     }
@@ -380,8 +384,29 @@ public class Test{
     }
 
 
-   
+    @Override
+    public int compareTo(Test arg0) {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    static int[] sort(int[] A){
+        for(int i = 0; i < A.length; i++){
+            for(int j = 0; j < A.length - i - 1; j++){
+                int c = j + 1;
+                if(A[j] > A[c]){
+                    int temp = A[c];
+                    A[c] = A[j];
+                    A[j] = temp;
+                }
+            }
+        }
+
+        return A;
+    }
+
 }
+
 
 
 
