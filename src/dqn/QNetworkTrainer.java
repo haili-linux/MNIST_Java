@@ -1,3 +1,4 @@
+package dqn;
 
 import java.util.ArrayList;
 
@@ -5,47 +6,55 @@ import haili.deeplearn.utils.MatrixUtil;
 import haili.deeplearn.utils.ThreadWork;
 
 
-public class Test {
-
-    static QLearning2 qLearning2 = new QLearning2("qLearnMode.txt");
+public class QNetworkTrainer {
+    static int WIDTH = 10;
+    static int HEIGHT = 10;
+    static final String modeName = "snakeGame10x10.txt";
+    static SnakeGame snakeGame = new SnakeGame(WIDTH, HEIGHT);
+    static QNetwork qNetwork = new QNetwork(WIDTH, HEIGHT, 3, SnakeGame.acts.length);
+    //qLearning2 = new QNetwork(modeName);
 
     static ArrayList<float[]> statesList = new ArrayList<>();
     static ArrayList<float[]> actList = new ArrayList<>();
     static ArrayList<Float> rewardList = new ArrayList<>();
     static ArrayList<Integer> gameOverList = new ArrayList<>();
-    static boolean test = false;
+    static boolean Test_model = false;
     static float Beta = 0.9f;
     static int multi_step = 2;
     static int trainDataLen =  1024 * 64;
     static int dataLen = trainDataLen * multi_step + multi_step;
+    static int update_Target_Model_Step = 1024 * 8;
+
+    static int save_model_time = 10 * 60 * 1000; //10min
 
 
     public static void main(String[] args) throws Exception{
 
-        System.out.println(qLearning2.model_main.loss);
-        SnakeGame snakeGame = new SnakeGame();
+        System.out.println("loss: " + qNetwork.model_main.loss);
+
         snakeGame.initGame();
 
 
         long time = System.currentTimeMillis();
-        int n = 0;
         int step = 0;
         while (true) {
-            snakeGame.VIEW = test;
+            snakeGame.VIEW = Test_model;
             snakeGame.render();
 
             float[] state = snakeGame.state();
-            float[] act = qLearning2.sample(state,  test);
-            statesList.add(state);
-            actList.add(act);
+            float[] act = qNetwork.sample(state, Test_model);
 
             snakeGame.doAction(act);
             snakeGame.update();
 
-            rewardList.add(snakeGame.reward());
-            gameOverList.add(snakeGame.gameOver ? 0:1);
+            if (!Test_model) {
+                statesList.add(state);
+                actList.add(act);
+                rewardList.add(snakeGame.reward());
+                gameOverList.add(snakeGame.gameOver ? 0 : 1);
+            }
 
-            if (!test && multi_step > 1) {
+            if (!Test_model && multi_step > 1) {
                 for (int i = 1; i < multi_step; i++) {
                     if (snakeGame.gameOver) {
                         statesList.add(new float[0]);
@@ -56,7 +65,7 @@ public class Test {
                     } else {
                         snakeGame.render();
                         float[] state_ti = snakeGame.state();
-                        float[] act_ti = qLearning2.sample(state, true);
+                        float[] act_ti = qNetwork.sample(state, true);
                         snakeGame.doAction(act_ti);
                         snakeGame.update();
                         statesList.add(state_ti);
@@ -70,26 +79,19 @@ public class Test {
             removeData();
 
             if(snakeGame.gameOver){
-                n++;
                 snakeGame.initGame();
             }
 
-
-
-
-
-
-
-            if (!test) {
+            if (!Test_model) {
                 long nowtime = System.currentTimeMillis();
-                if (nowtime - time > 10 * 60 * 1000) {
-                    qLearning2.save("qLearnMode.txt");
+                if (nowtime - time > save_model_time) {
+                    qNetwork.save(modeName);
                     time = nowtime;
                 }
 
                 step ++;
-                if (statesList.size() == dataLen && step >= 1024 * 8) {
-                    qLearning2.updateModel_Target();
+                if (statesList.size() == dataLen && step >= update_Target_Model_Step) {
+                    qNetwork.updateModel_Target();
                     step = 0;
                     training();
                 }
@@ -101,7 +103,7 @@ public class Test {
 
     }
 
-    public static void removeData() {
+    private static void removeData() {
         if (statesList.size() > dataLen) {
             for (int i = 0; i < multi_step; i++) {
                 statesList.remove(0);
@@ -112,21 +114,12 @@ public class Test {
         }
     }
 
-    public static void training() {
+    private static void training() {
         if (rewardList.isEmpty())
             return;
 
         float[][] train_x = new float[trainDataLen][];
         float[][] train_y = new float[trainDataLen][];
-
-//        for (int i = 0; i < train_x.length; i++) {
-//            train_x[i] = MatrixUtil.combine(statusList.get(i), actList.get(i));
-//
-//            if (gameOverList.get(i) == 1 && i < train_x.length - 1)
-//                train_y[i] = new float[]{ sorceList.get(i) + 0.9f * qLearning2.getMaxSorce(statusList.get(i + 1))};
-//            else
-//                train_y[i] = new float[]{ sorceList.get(i) };
-//        }
 
         ThreadWork.ThreadWorker threadWorker = new ThreadWork.ThreadWorker(trainDataLen) {
             @Override
@@ -136,11 +129,6 @@ public class Test {
                 if (train_x[index].length < 1) {
                     System.out.println();
                 }
-
-//                if (gameOverList.get(index) == 1 && index < train_x.length - 1)
-//                    train_y[index] = new float[]{ rewardList.get(index) + Beta * qLearning2.getMaxSorce(statesList.get(index + 1))};
-//                else
-//                    train_y[index] = new float[]{ rewardList.get(index) };
 
                 train_y[index] = new float[1];
                 float beta = 1f;
@@ -155,14 +143,14 @@ public class Test {
                     beta *= Beta;
                 }
 
-                train_y[index][0] += beta * qLearning2.getMaxSorce(statesList.get( index_base + multi_step ));
+                train_y[index][0] += beta * qNetwork.getMaxQ(statesList.get( index_base + multi_step ));
             }
 
         };
         ThreadWork.start(threadWorker, 24);
 
-        System.out.println(qLearning2.model_main.calculateLoss(train_x, train_y));
-        qLearning2.model_main.fit(train_x, train_y, 128, 5, 24);
+        System.out.println("loss: " + qNetwork.model_main.calculateLoss(train_x, train_y));
+        qNetwork.model_main.fit(train_x, train_y, 128, 5, 24);
     }
 
 }
