@@ -1,5 +1,5 @@
 # MNIST_Java
-基于Java在mnist手写体数字数据集上的卷积神经网络、自编码器、变分编码器(VAE)、生成对抗模型实验。
+基于Java在mnist手写体数字数据集上的卷积神经网络、自编码器、变分编码器(VAE)、生成对抗模型、强化学习实验。
 
 数据说明：
 
@@ -24,6 +24,9 @@
    
 3. VAE Encoder
    ![Image text](https://github.com/haili-linux/MNIST_Java/blob/master/image/vae.png?raw=true)
+
+4. DQN snakeGames mp4
+   [Download the demo video](https://github.com/haili-linux/MNIST_Java/blob/master/image/snakeTest.mp4)
 
 
 
