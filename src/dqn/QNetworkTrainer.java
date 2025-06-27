@@ -10,16 +10,17 @@ public class QNetworkTrainer {
     static int WIDTH = 10;
     static int HEIGHT = 10;
     static final String modeName = "snakeGame10x10.txt";
-    static SnakeGame snakeGame = new SnakeGame(WIDTH, HEIGHT);
-    static QNetwork qNetwork = new QNetwork(WIDTH, HEIGHT, 3, SnakeGame.acts.length);
-    //qLearning2 = new QNetwork(modeName);
+    static SnakeGame snakeGame = new SnakeGame(WIDTH, HEIGHT, true);
+    //static QNetwork qNetwork = new QNetwork(WIDTH, HEIGHT, 3, SnakeGame.acts.length);
+    static QNetwork qNetwork = new QNetwork(modeName);
 
-    static boolean Test_model = false;
+
+    static boolean Test_model = true; //training:false
     static float Beta = 0.9f;
-    static int multi_step = 2;
-    static int trainDataLen =  1024 * 64;
+    static int multi_step = 1;
+    static int trainDataLen =  1024 * 64 * 2;
     static int dataLen = trainDataLen * multi_step + multi_step;
-    static int update_Target_Model_Step = 1024 * 8;
+    static int update_Target_Model_Step = 1024 * 8 * 4;
 
     static int save_model_time = 10 * 60 * 1000; //10min
 
@@ -33,10 +34,16 @@ public class QNetworkTrainer {
         long time = System.currentTimeMillis();
         int step = 0;
         while (true) {
+            if (!snakeGame.start) {
+                Thread.sleep(10);
+                continue;
+            }
+
             snakeGame.VIEW = Test_model;
             snakeGame.render();
 
             float[] state = snakeGame.state();
+
             float[] act = qNetwork.sample(state, Test_model);
 
             snakeGame.doAction(act);
@@ -90,6 +97,50 @@ public class QNetworkTrainer {
 
     }
 
+    /**
+     * 把图片分割
+     * @param image 图片
+     * @param w 图片width
+     * @param h 图片h
+     * @param split_w 分割成的小块的width
+     * @param split_h h
+     * @return 分割后的图块平铺后组成的数组
+     */
+    public static float[] reshapeImage(float[] image, int w, int h, int split_w, int split_h){
+        int sw_n = w / split_w;
+        int sh_n = h / split_h;
+        if(w < split_w || h < split_h || w % split_w != 0 || h % split_h != 0) {
+            System.out.println("不可分割.");
+            return null;
+        }
+        float[] reshapeImage = new float[image.length];
+
+        int sn = sw_n * sh_n;
+        int s_len = split_w * split_h;
+
+        //float[][] sImage = new float[sn][s_len];
+        for(int i = 0; i < sn; i++){
+            int ds = i * s_len;
+            int sx = i % sw_n;
+            int sy = i / sw_n;
+
+            for(int j = 0; j < s_len; j++){
+                int x_ = j % split_w;
+                int y_ = j / split_w;
+
+                int x = sx * split_w + x_;
+                int y = sy * split_h + y_;
+                int index_x_y = x * w + y;
+                reshapeImage[ds + j] = image[index_x_y];// +  (i / 160f); // 额外加上位置编码
+                //sImage[i][j] = image[index_x_y];
+            }
+        }
+        //LoadImage.showImages(sImage, split_w, split_h, 4, 4,null);
+        //LoadImage.showImages(new float[][]{image}, w, h, null);
+        return  reshapeImage;
+    }
+
+
     private static void training(TrainData trainData) {
         ArrayList<float[]> statesList = trainData.getStatesList();
         ArrayList<float[]> actList = trainData.getActList();
@@ -129,7 +180,7 @@ public class QNetworkTrainer {
         ThreadWork.start(threadWorker, 24);
 
         System.out.println("loss: " + qNetwork.model_main.calculateLoss(train_x, train_y));
-        qNetwork.model_main.fit(train_x, train_y, 128, 5, 24);
+        qNetwork.model_main.fit(train_x, train_y, 512, 5, 24);
     }
 
 
@@ -157,7 +208,7 @@ public class QNetworkTrainer {
         }
 
         public void removeData() {
-            if (statesList.size() > dataLen) {
+            while (statesList.size() > dataLen) {
                 for (int i = 0; i < multi_step; i++) {
                     statesList.remove(0);
                     actList.remove(0);

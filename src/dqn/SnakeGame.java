@@ -17,28 +17,40 @@ public class SnakeGame {
     int WIDTH;
     int HEIGHT;
 
-    private final Deque<Point> snake;
+    private Deque<Point> snake;
     private Point food;
     private int eatFood = 0;
     private char direction = 'D';
     public boolean gameOver = false;
-    private final Random random;
+    private Random random;
     public StringBuffer gameStr;
 
-    public boolean VIEW = true;
+    public boolean VIEW;
+    public boolean start = true;
 
     BoardDisplay boardDisplay;
 
+    public SnakeGame(int width, int height, boolean view){
+       init(width, height, view);
+    }
+
     public SnakeGame(int width, int height){
+        init(width, height, false);
+    }
+
+    private void init(int width, int height, boolean view) {
         WIDTH = width;
         HEIGHT = height;
         snake = new LinkedList<>();
         random = new Random();
         gameStr = new StringBuffer();
-        boardDisplay = new BoardDisplay();
-        SwingUtilities.invokeLater(() -> {
-            boardDisplay.setVisible(true);
-        });
+        VIEW = view;
+        if (view) {
+            boardDisplay = new BoardDisplay(this);
+            SwingUtilities.invokeLater(() -> {
+                boardDisplay.setVisible(true);
+            });
+        }
     }
 
     public float[] randomAction(){
@@ -75,16 +87,34 @@ public class SnakeGame {
                 case SNAKE_HEAD_CHAR:
                     r[i + s.length() * 2] = 1f;
                     break;
-                /*
-                case WALL_CHAR:
-                    r[i + s.length() * 3] = 1;
-                    break;
-                    */
             }
         }
 
         return r;
     }
+
+    public float[] state_oneChanel(){
+        String s = gameStr.toString();
+        s = s.replace(WALL_CHAR,'\n').replace("\n", "");
+        float[] r = new float[s.length()];
+        for(int i = 0; i < s.length(); i++){
+            char c = s.charAt(i);
+            switch (c) {
+                case FOOD_CHAR:
+                    r[i] = 1f;
+                    break;
+                case SNAKE_BODY_CHAR:
+                    r[i] = -0.5f;
+                    break;
+                case SNAKE_HEAD_CHAR:
+                    r[i] = -1f;
+                    break;
+            }
+        }
+        return r;
+    }
+
+
 
     public void initGame() {
         gameOver = false;
@@ -233,8 +263,11 @@ public class SnakeGame {
     public static class BoardDisplay extends JFrame {
 
         private final JTextArea boardArea;
+        private SnakeGame snakeGame;
+        JButton b2;
 
-        public BoardDisplay() {
+        public BoardDisplay(SnakeGame snakeGame) {
+            this.snakeGame = snakeGame;
             setTitle("SnakeGame");
             setSize(400, 400);
             setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -247,7 +280,7 @@ public class SnakeGame {
             JButton refreshButton = new JButton("test model");
 
             refreshButton.addActionListener(e -> updateBoard());
-            JButton b2 = new JButton("　");
+            b2 = new JButton( "stop");
             b2.addActionListener(e -> f2());
 
             setLayout(new BorderLayout());
@@ -262,7 +295,9 @@ public class SnakeGame {
         }
 
         private void f2() {
-
+            snakeGame.start = !snakeGame.start;
+            String txt =  snakeGame.start ? "stop" : "start";
+            b2.setText(txt);
         }
 
         public void  setText(String text) {

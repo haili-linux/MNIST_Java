@@ -16,22 +16,38 @@ public class QNetwork {
     Sequential model_target;
 
     public QNetwork(int input_width, int input_height, int input_chanel, int action_dimension){
+
+        /*
         Sequential sNet = new Sequential(input_width, input_height, input_width * input_height * input_chanel);
         sNet.addLayer(new Conv2D(3, 3, 8, 1, new Relu()));
         sNet.addLayer(new Conv2D(3, 3, 16, 1, new Relu()));
         sNet.addLayer(new Dense(128, new LRelu()));
 
 
-        Sequential qNet = new Sequential(sNet.output_dimension + action_dimension/*act dimension*/);
-//        ResBlock resBlock_split = new ResBlock(new SplitLayer(sNet.output_dimension, action_dimension), ResBlock.ResConnectType_Concat);
-//        resBlock_split.addLayer(new Dense(128 - action_dimension));
-//        resBlock_split.addLayer(new FilterResponseNormalization());
-//        resBlock_split.addLayer(new ActivationLayer(new LRelu()));
-//        qNet.addLayer(resBlock_split);
+        Sequential qNet = new Sequential(sNet.output_dimension + action_dimension);
         qNet.addLayer(new Dense(128));
         qNet.addLayer(new FilterResponseNormalization());
         qNet.addLayer(new ActivationLayer(new LRelu()));
 
+        qNet.addLayer(new Dense(64));
+        qNet.addLayer(new FilterResponseNormalization());
+        qNet.addLayer(new ActivationLayer(new LRelu()));
+
+        qNet.addLayer(new Dense(32));
+        qNet.addLayer(new FilterResponseNormalization());
+        qNet.addLayer(new ActivationLayer(new LRelu()));
+        qNet.addLayer(new Dense(1));
+        */
+
+        //selfAttention mode
+        Sequential sNet = new Sequential(input_width, input_height, input_width * input_height * input_chanel);
+        sNet.addLayer(new PositionLayer(4, 2, 25));
+        sNet.addLayer(new SelfAttention(6, 32, 32));
+        sNet.addLayer(new CombineSequencesLayer(32));
+        sNet.addLayer(new FilterResponseNormalization());
+        sNet.addLayer(new ActivationLayer(new LRelu()));
+
+        Sequential qNet = new Sequential(sNet.output_dimension + action_dimension);
         qNet.addLayer(new Dense(64));
         qNet.addLayer(new FilterResponseNormalization());
         qNet.addLayer(new ActivationLayer(new LRelu()));
